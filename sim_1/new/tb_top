@@ -1,0 +1,72 @@
+`timescale 1ns / 1ps
+
+module tb_top;
+
+    reg clk;
+    reg reset;
+    reg rx;
+    wire trigger;
+    reg echo;
+    wire tx;
+    wire [7:0] seg;
+    wire [3:0] an;
+
+    top_module uut (
+        .clk(clk),
+        .reset(reset),
+        .rx(rx),
+        .trigger(trigger),
+        .echo(echo),
+        .tx(tx),
+        .seg(seg),
+        .an(an)
+    );
+
+    // Clock generation: 100MHz (10ns period)
+    always #5 clk = ~clk;
+
+    initial begin
+        clk = 0;
+        reset = 1;
+        rx = 1;      // idle high
+        echo = 0;
+        #1000;
+        reset =0;
+
+        #100_000;
+        reset = 0;
+
+        // Send UART 'U' (0x55 = 8'b01010101)
+        send_uart_byte(8'h55);
+
+        // Simulate echo signal after trigger
+        wait(trigger == 1);
+        #100; // wait a bit
+        echo = 1;
+        #500_000;  // ~500us -->8cm정도
+        echo = 0;
+
+        #100_000;
+        $finish;
+    end
+
+    task send_uart_byte;
+        input [7:0] data;
+        integer i;
+        begin
+            // Start bit
+            rx = 0;
+            #(104160); // 9600bps → 104.16μs
+
+            // 8 data bits (LSB first)
+            for (i = 0; i < 8; i = i + 1) begin
+                rx = data[i];
+                #(104160);
+            end
+
+            // Stop bit
+            rx = 1;
+            #(104160);
+        end
+    endtask
+endmodule
